@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import { Mail, Phone, MapPin, Clock, Send } from "lucide-react";
 
 const nigerianStates = [
@@ -70,26 +71,48 @@ export default function Contact() {
     e.preventDefault();
     setIsSubmitting(true);
 
-    // Simulate form submission
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    try {
+      const { error } = await supabase.from("service_requests").insert([
+        {
+          name: formData.name,
+          company_name: formData.companyName || null,
+          email: formData.email,
+          phone: formData.phone,
+          state: formData.state,
+          farm_size_ha: formData.farmSize ? parseFloat(formData.farmSize) : null,
+          crop_type: formData.cropType || null,
+          message: formData.message || null,
+        },
+      ]);
 
-    toast({
-      title: "Request Submitted Successfully!",
-      description:
-        "Thank you for your interest. Our team will contact you within 24 hours with a customized quote.",
-    });
+      if (error) throw error;
 
-    setFormData({
-      name: "",
-      companyName: "",
-      email: "",
-      phone: "",
-      state: "",
-      farmSize: "",
-      cropType: "",
-      message: "",
-    });
-    setIsSubmitting(false);
+      toast({
+        title: "Request Submitted Successfully!",
+        description:
+          "Thank you for your interest. Our team will contact you within 24 hours with a customized quote.",
+      });
+
+      setFormData({
+        name: "",
+        companyName: "",
+        email: "",
+        phone: "",
+        state: "",
+        farmSize: "",
+        cropType: "",
+        message: "",
+      });
+    } catch (error) {
+      console.error("Error submitting request:", error);
+      toast({
+        title: "Submission Failed",
+        description: "There was an error submitting your request. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
