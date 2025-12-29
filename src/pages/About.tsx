@@ -1,7 +1,7 @@
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { Target, Eye, Heart, Users, Award, Globe } from "lucide-react";
+import { Target, Eye, Heart, Users, Award, Globe, Rocket } from "lucide-react";
 
 const values = [
   {
@@ -27,12 +27,10 @@ const values = [
 ];
 
 const milestones = [
-  { year: "2019", event: "Founded with a vision to transform Nigerian agriculture through precision technology" },
-  { year: "2020", event: "Completed first 500 hectares of precision soil mapping in Kaduna State" },
-  { year: "2021", event: "Expanded services to 6 states across Nigeria's agricultural belt" },
-  { year: "2022", event: "Launched variable-rate application partnerships with major fertilizer companies" },
-  { year: "2023", event: "Reached milestone of 10,000+ hectares mapped with proven yield improvements" },
-  { year: "2024", event: "Introduced advanced GIS analytics and subscription-based services" },
+  { year: "Dec 2025", event: "GeoSoilLab founded in Kano, Nigeria with a mission to transform precision agriculture" },
+  { year: "Q1 2026", event: "Launch commercial services and complete first client projects in Northern Nigeria" },
+  { year: "Q2 2026", event: "Expand services across Nigeria's agricultural belt" },
+  { year: "2027", event: "Scale operations and introduce advanced GIS analytics and subscription-based services" },
 ];
 
 export default function About() {
@@ -46,8 +44,8 @@ export default function About() {
               About Us
             </span>
             <h1 className="font-serif text-4xl lg:text-5xl xl:text-6xl font-bold text-foreground mb-6 leading-tight">
-              Transforming Nigerian Agriculture Through{" "}
-              <span className="text-primary">Precision Science</span>
+              Pioneering Precision Agriculture in{" "}
+              <span className="text-primary">Northern Nigeria</span>
             </h1>
             <p className="text-lg lg:text-xl text-muted-foreground max-w-2xl mx-auto">
               We combine cutting-edge soil science with advanced GIS technology to help farmers 
@@ -62,29 +60,29 @@ export default function About() {
         <div className="container mx-auto px-4 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
             <div>
-              <span className="inline-block px-3 py-1 rounded-full bg-accent/10 text-accent text-sm font-medium mb-4">
+              <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent/10 text-accent text-sm font-medium mb-4">
+                <Rocket className="w-4 h-4" />
                 Our Story
               </span>
               <h2 className="font-serif text-3xl lg:text-4xl font-bold text-foreground mb-6">
-                From Research to Real-World Impact
+                A Fresh Start in Precision Agriculture
               </h2>
               <div className="space-y-4 text-muted-foreground">
                 <p>
-                  PrecisionSoil was born from a simple observation: Nigerian farmers were applying 
-                  fertilizers uniformly across their fields, unaware that soil properties can vary 
-                  dramatically within a single hectare.
+                  GeoSoilLab was founded in December 2025 in Kano, Nigeria, born from a simple but powerful 
+                  observation: Nigerian farmers are applying fertilizers uniformly across their fields, 
+                  unaware that soil properties can vary dramatically within a single hectare.
                 </p>
                 <p>
-                  Our founders, a team of soil scientists and GIS specialists, saw an opportunity 
-                  to bridge the gap between advanced agricultural research and practical farming. 
-                  They set out to make precision agriculture accessible and affordable for farmers 
-                  of all scales.
+                  Our founding team of soil scientists and GIS specialists saw an opportunity to bridge 
+                  the gap between advanced agricultural research and practical farming. We set out to make 
+                  precision agriculture accessible and affordable for farmers of all scales across Nigeria.
                 </p>
                 <p>
-                  Today, we've helped hundreds of farmers across Nigeria optimize their fertilizer 
-                  use, improving yields by an average of 25% while reducing input costs by up to 30%. 
-                  Our work continues to expand as we partner with fertilizer companies, agricultural 
-                  dealers, and progressive farmers committed to sustainable intensification.
+                  As a startup, we bring fresh perspectives, cutting-edge technology, and an unwavering 
+                  commitment to helping farmers optimize their fertilizer use, improve yields, and reduce 
+                  input costs. Our work is just beginning, but our vision is clear: to become Nigeria's 
+                  trusted partner in precision soil intelligence.
                 </p>
               </div>
             </div>
@@ -95,8 +93,8 @@ export default function About() {
                 </div>
               </div>
               <div className="absolute -bottom-6 -left-6 bg-card p-6 rounded-xl shadow-lg border border-border">
-                <div className="text-3xl font-bold text-primary">10,000+</div>
-                <div className="text-sm text-muted-foreground">Hectares Mapped</div>
+                <div className="text-3xl font-bold text-primary">Dec 2025</div>
+                <div className="text-sm text-muted-foreground">Founded in Kano</div>
               </div>
             </div>
           </div>
@@ -130,7 +128,7 @@ export default function About() {
               <p className="text-muted-foreground leading-relaxed">
                 A future where every Nigerian farmer has access to precision soil intelligence, 
                 where fertilizer waste is eliminated, and where agricultural productivity grows 
-                hand-in-hand with environmental stewardship. We envision becoming West Africa's 
+                hand-in-hand with environmental stewardship. We envision becoming Nigeria's 
                 leading precision agriculture partner.
               </p>
             </div>
@@ -177,11 +175,14 @@ export default function About() {
         <div className="container mx-auto px-4 lg:px-8">
           <div className="text-center max-w-2xl mx-auto mb-16">
             <span className="inline-block px-3 py-1 rounded-full bg-accent/10 text-accent text-sm font-medium mb-4">
-              Our Journey
+              Our Roadmap
             </span>
             <h2 className="font-serif text-3xl lg:text-4xl font-bold text-foreground mb-4">
               Key Milestones
             </h2>
+            <p className="text-muted-foreground">
+              Our journey from startup to Nigeria's precision agriculture leader.
+            </p>
           </div>
 
           <div className="max-w-3xl mx-auto">
@@ -218,11 +219,11 @@ export default function About() {
         <div className="container mx-auto px-4 lg:px-8">
           <div className="max-w-4xl mx-auto text-center bg-gradient-hero rounded-3xl p-12 lg:p-16">
             <h2 className="font-serif text-3xl lg:text-4xl font-bold text-primary-foreground mb-4">
-              Ready to Transform Your Farm?
+              Be Among Our First Clients
             </h2>
             <p className="text-primary-foreground/80 mb-8 max-w-2xl mx-auto">
-              Join hundreds of forward-thinking farmers who are already benefiting from 
-              precision soil mapping and variable-rate fertilizer applications.
+              Join us at the start of something transformative. Be among the first farmers to 
+              benefit from precision soil mapping and variable-rate fertilizer applications.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button size="lg" variant="hero" asChild>
