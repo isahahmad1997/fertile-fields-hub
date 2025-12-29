@@ -53,7 +53,7 @@ const features = [
 const testimonials = [
   {
     quote:
-      "PrecisionSoil helped us reduce fertilizer costs by 35% while increasing our maize yield. The maps are incredibly accurate.",
+      "GeoSoilLab helped us reduce fertilizer costs by 35% while increasing our maize yield. The maps are incredibly accurate.",
     author: "Adekunle Okonkwo",
     role: "Farm Manager, Oyo State",
   },

@@ -26,7 +26,7 @@ export function Navbar() {
               <Leaf className="w-6 h-6 text-primary-foreground" />
             </div>
             <span className="font-serif text-xl font-semibold text-foreground group-hover:text-primary transition-colors">
-              PrecisionSoil
+              GeoSoilLab
             </span>
           </Link>
 

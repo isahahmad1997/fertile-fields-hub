@@ -132,10 +132,10 @@ export default function Contact() {
                   <div>
                     <p className="font-semibold text-foreground">Email</p>
                     <a
-                      href="mailto:info@precisionsoil.ng"
+                      href="mailto:geosoillab@gmail.com"
                       className="text-muted-foreground hover:text-primary transition-colors"
                     >
-                      info@precisionsoil.ng
+                      geosoillab@gmail.com
                     </a>
                   </div>
                 </div>
@@ -147,10 +147,10 @@ export default function Contact() {
                   <div>
                     <p className="font-semibold text-foreground">Phone</p>
                     <a
-                      href="tel:+2348001234567"
+                      href="tel:+2347074075053"
                       className="text-muted-foreground hover:text-primary transition-colors"
                     >
-                      +234 800 123 4567
+                      +234 707 407 5053
                     </a>
                   </div>
                 </div>
@@ -162,7 +162,7 @@ export default function Contact() {
                   <div>
                     <p className="font-semibold text-foreground">Office</p>
                     <p className="text-muted-foreground">
-                      Lagos, Nigeria
+                      Kano, Nigeria
                     </p>
                   </div>
                 </div>
@@ -174,8 +174,8 @@ export default function Contact() {
                   <div>
                     <p className="font-semibold text-foreground">Business Hours</p>
                     <p className="text-muted-foreground">
-                      Mon - Fri: 8:00 AM - 6:00 PM<br />
-                      Sat: 9:00 AM - 2:00 PM
+                      Mon - Fri: 9:00 AM - 5:00 PM<br />
+                      Sat: 9:00 AM - 3:00 PM
                     </p>
                   </div>
                 </div>

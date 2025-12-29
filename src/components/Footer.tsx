@@ -33,25 +33,25 @@ export function Footer() {
               <div className="w-10 h-10 rounded-lg bg-primary-foreground/20 flex items-center justify-center">
                 <Leaf className="w-6 h-6 text-primary-foreground" />
               </div>
-              <span className="font-serif text-xl font-semibold">
-                PrecisionSoil
+            <span className="font-serif text-xl font-semibold">
+                GeoSoilLab
               </span>
             </Link>
             <p className="text-primary-foreground/80 mb-6 max-w-sm">
-              Leading precision soil fertility mapping and variable-rate fertilizer services across Nigeria. Helping farmers maximize yields with data-driven insights.
+              Precision soil fertility mapping and variable-rate fertilizer services in Nigeria. Helping farmers maximize yields with data-driven insights.
             </p>
             <div className="flex flex-col gap-3">
-              <a href="mailto:info@precisionsoil.ng" className="flex items-center gap-2 text-primary-foreground/80 hover:text-primary-foreground transition-colors">
+              <a href="mailto:geosoillab@gmail.com" className="flex items-center gap-2 text-primary-foreground/80 hover:text-primary-foreground transition-colors">
                 <Mail className="w-4 h-4" />
-                info@precisionsoil.ng
+                geosoillab@gmail.com
               </a>
-              <a href="tel:+2348001234567" className="flex items-center gap-2 text-primary-foreground/80 hover:text-primary-foreground transition-colors">
+              <a href="tel:+2347074075053" className="flex items-center gap-2 text-primary-foreground/80 hover:text-primary-foreground transition-colors">
                 <Phone className="w-4 h-4" />
-                +234 800 123 4567
+                +234 707 407 5053
               </a>
               <span className="flex items-center gap-2 text-primary-foreground/80">
                 <MapPin className="w-4 h-4" />
-                Lagos, Nigeria
+                Kano, Nigeria
               </span>
             </div>
           </div>
@@ -111,7 +111,7 @@ export function Footer() {
         {/* Bottom Bar */}
         <div className="mt-12 pt-8 border-t border-primary-foreground/20 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-primary-foreground/60 text-sm">
-            © {new Date().getFullYear()} PrecisionSoil Nigeria. All rights reserved.
+            © {new Date().getFullYear()} GeoSoilLab Nigeria. All rights reserved.
           </p>
           <div className="flex gap-6">
             <Link to="/privacy" className="text-primary-foreground/60 text-sm hover:text-primary-foreground transition-colors">
