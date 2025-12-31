@@ -14,46 +14,30 @@ import {
   CreditCard,
   User,
   Home,
+  FlaskConical,
+  Map,
+  Layers,
 } from "lucide-react";
+import type { Database } from "@/integrations/supabase/types";
 
-interface ClientData {
-  id: string;
-  company_name: string;
-  contact_person: string;
-}
-
-interface Farm {
-  id: string;
-  farm_name: string;
-  total_area_ha: number;
-  crop_type: string | null;
-  location_description: string | null;
-}
-
-interface Service {
-  id: string;
-  service_type: string;
-  status: string;
-  area_covered_ha: number | null;
-  cost: number | null;
-  created_at: string;
-}
-
-interface Subscription {
-  id: string;
-  plan: string;
-  status: string;
-  start_date: string;
-  end_date: string;
-}
+type ClientData = Database["public"]["Tables"]["clients"]["Row"];
+type Farm = Database["public"]["Tables"]["farms"]["Row"];
+type Field = Database["public"]["Tables"]["fields"]["Row"];
+type Service = Database["public"]["Tables"]["services"]["Row"];
+type Subscription = Database["public"]["Tables"]["subscriptions"]["Row"];
+type SoilSample = Database["public"]["Tables"]["soil_samples"]["Row"];
+type GisOutput = Database["public"]["Tables"]["gis_outputs"]["Row"];
 
 export default function ClientDashboard() {
   const navigate = useNavigate();
   const { user, loading, signOut, isAdmin } = useAuth();
   const [clientData, setClientData] = useState<ClientData | null>(null);
   const [farms, setFarms] = useState<Farm[]>([]);
+  const [fields, setFields] = useState<Field[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [soilSamples, setSoilSamples] = useState<SoilSample[]>([]);
+  const [gisOutputs, setGisOutputs] = useState<GisOutput[]>([]);
   const [loadingData, setLoadingData] = useState(true);
 
   useEffect(() => {
@@ -73,7 +57,7 @@ export default function ClientDashboard() {
 
   const fetchClientData = async () => {
     try {
-      // Fetch client profile
+      // Fetch client profile linked to user
       const { data: client } = await supabase
         .from("clients")
         .select("*")
@@ -90,6 +74,37 @@ export default function ClientDashboard() {
           .eq("client_id", client.id);
 
         setFarms(farmsData || []);
+
+        // Fetch fields for all farms
+        if (farmsData && farmsData.length > 0) {
+          const farmIds = farmsData.map(f => f.id);
+          const { data: fieldsData } = await supabase
+            .from("fields")
+            .select("*")
+            .in("farm_id", farmIds);
+
+          setFields(fieldsData || []);
+
+          // Fetch soil samples for all fields
+          if (fieldsData && fieldsData.length > 0) {
+            const fieldIds = fieldsData.map(f => f.id);
+            const [soilRes, gisRes] = await Promise.all([
+              supabase
+                .from("soil_samples")
+                .select("*")
+                .in("field_id", fieldIds)
+                .order("sampling_date", { ascending: false }),
+              supabase
+                .from("gis_outputs")
+                .select("*")
+                .in("field_id", fieldIds)
+                .order("created_at", { ascending: false }),
+            ]);
+
+            setSoilSamples(soilRes.data || []);
+            setGisOutputs(gisRes.data || []);
+          }
+        }
 
         // Fetch services
         const { data: servicesData } = await supabase
@@ -120,6 +135,13 @@ export default function ClientDashboard() {
   const handleSignOut = async () => {
     await signOut();
     navigate("/");
+  };
+
+  const getFieldName = (fieldId: string) => {
+    const field = fields.find(f => f.id === fieldId);
+    if (!field) return "Unknown Field";
+    const farm = farms.find(f => f.id === field.farm_id);
+    return `${farm?.farm_name || "Unknown"} - ${field.field_name}`;
   };
 
   if (loading || loadingData) {
@@ -244,24 +266,160 @@ export default function ClientDashboard() {
                   </p>
                 ) : (
                   <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {farms.map((farm) => (
-                      <Card key={farm.id} className="bg-muted/50">
+                    {farms.map((farm) => {
+                      const farmFields = fields.filter(f => f.farm_id === farm.id);
+                      return (
+                        <Card key={farm.id} className="bg-muted/50">
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-lg">{farm.farm_name}</CardTitle>
+                            <CardDescription>
+                              {farm.location_description || "No location description"}
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="space-y-1 text-sm">
+                              <p>
+                                <span className="text-muted-foreground">Area:</span>{" "}
+                                <span className="font-medium">{farm.total_area_ha} ha</span>
+                              </p>
+                              <p>
+                                <span className="text-muted-foreground">Crop:</span>{" "}
+                                <span className="font-medium">{farm.crop_type || "N/A"}</span>
+                              </p>
+                              <p>
+                                <span className="text-muted-foreground">Fields:</span>{" "}
+                                <span className="font-medium">{farmFields.length}</span>
+                              </p>
+                            </div>
+                            {farmFields.length > 0 && (
+                              <div className="mt-3 pt-3 border-t border-border">
+                                <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                                  <Layers className="w-3 h-3" /> Fields:
+                                </p>
+                                <div className="flex flex-wrap gap-1">
+                                  {farmFields.map(field => (
+                                    <span key={field.id} className="text-xs px-2 py-0.5 rounded bg-primary/10 text-primary">
+                                      {field.field_name} ({field.area_ha} ha)
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Soil Samples Section */}
+            <Card className="mb-8">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FlaskConical className="w-5 h-5" />
+                  Soil Lab Results
+                </CardTitle>
+                <CardDescription>
+                  View your soil sample analysis results
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {soilSamples.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">
+                    No soil samples yet. Contact us to schedule soil testing.
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left py-3 px-4 font-medium">Field</th>
+                          <th className="text-left py-3 px-4 font-medium">Date</th>
+                          <th className="text-left py-3 px-4 font-medium">pH</th>
+                          <th className="text-left py-3 px-4 font-medium">N</th>
+                          <th className="text-left py-3 px-4 font-medium">P</th>
+                          <th className="text-left py-3 px-4 font-medium">K</th>
+                          <th className="text-left py-3 px-4 font-medium">OM %</th>
+                          <th className="text-left py-3 px-4 font-medium">Lab</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {soilSamples.map((sample) => (
+                          <tr key={sample.id} className="border-b last:border-0">
+                            <td className="py-3 px-4 text-sm">{getFieldName(sample.field_id)}</td>
+                            <td className="py-3 px-4 text-sm">
+                              {new Date(sample.sampling_date).toLocaleDateString()}
+                            </td>
+                            <td className="py-3 px-4 text-sm">{sample.ph ?? "-"}</td>
+                            <td className="py-3 px-4 text-sm">{sample.nitrogen ?? "-"}</td>
+                            <td className="py-3 px-4 text-sm">{sample.phosphorus ?? "-"}</td>
+                            <td className="py-3 px-4 text-sm">{sample.potassium ?? "-"}</td>
+                            <td className="py-3 px-4 text-sm">{sample.organic_matter ?? "-"}</td>
+                            <td className="py-3 px-4 text-sm">{sample.lab_name || "-"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* GIS Outputs Section */}
+            <Card className="mb-8">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Map className="w-5 h-5" />
+                  GIS Maps & Outputs
+                </CardTitle>
+                <CardDescription>
+                  View and download your field maps and analysis
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {gisOutputs.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">
+                    No GIS outputs yet. These will appear after field mapping is complete.
+                  </p>
+                ) : (
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {gisOutputs.map((output) => (
+                      <Card key={output.id} className="bg-muted/50">
                         <CardHeader className="pb-2">
-                          <CardTitle className="text-lg">{farm.farm_name}</CardTitle>
+                          <CardTitle className="text-base flex items-center gap-2">
+                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                              output.map_type === "N" ? "bg-green-500/10 text-green-600" :
+                              output.map_type === "P" ? "bg-blue-500/10 text-blue-600" :
+                              output.map_type === "K" ? "bg-amber-500/10 text-amber-600" :
+                              output.map_type === "pH" ? "bg-red-500/10 text-red-600" :
+                              "bg-purple-500/10 text-purple-600"
+                            }`}>
+                              {output.map_type}
+                            </span>
+                          </CardTitle>
                           <CardDescription>
-                            {farm.location_description || "No location description"}
+                            {getFieldName(output.field_id)}
                           </CardDescription>
                         </CardHeader>
                         <CardContent>
-                          <div className="space-y-1 text-sm">
-                            <p>
-                              <span className="text-muted-foreground">Area:</span>{" "}
-                              <span className="font-medium">{farm.total_area_ha} ha</span>
+                          <div className="space-y-2 text-sm">
+                            {output.season && (
+                              <p>
+                                <span className="text-muted-foreground">Season:</span>{" "}
+                                <span className="font-medium">{output.season}</span>
+                              </p>
+                            )}
+                            <p className="text-xs text-muted-foreground">
+                              Created: {new Date(output.created_at).toLocaleDateString()}
                             </p>
-                            <p>
-                              <span className="text-muted-foreground">Crop:</span>{" "}
-                              <span className="font-medium">{farm.crop_type || "N/A"}</span>
-                            </p>
+                            <Button variant="outline" size="sm" className="w-full mt-2" asChild>
+                              <a href={output.file_url} target="_blank" rel="noopener noreferrer">
+                                <Download className="w-4 h-4 mr-2" />
+                                Download
+                              </a>
+                            </Button>
                           </div>
                         </CardContent>
                       </Card>
