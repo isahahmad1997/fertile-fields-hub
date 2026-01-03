@@ -14,6 +14,21 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Mail, Phone, MapPin, Clock, Send } from "lucide-react";
+import { z } from "zod";
+
+// Contact form validation schema
+const contactFormSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(100, "Name must be less than 100 characters"),
+  companyName: z.string().trim().max(200, "Company name must be less than 200 characters").optional(),
+  email: z.string().trim().email("Invalid email address").max(255, "Email must be less than 255 characters"),
+  phone: z.string().trim().min(1, "Phone number is required").max(20, "Phone number must be less than 20 characters"),
+  state: z.string().min(1, "State is required"),
+  farmSize: z.string()
+    .transform(val => val ? parseFloat(val) : null)
+    .refine(val => val === null || (!isNaN(val) && val > 0), { message: 'Farm size must be a positive number' }),
+  cropType: z.string().optional(),
+  message: z.string().trim().max(2000, "Message must be less than 2000 characters").optional(),
+});
 
 const nigerianStates = [
   "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno",
@@ -72,16 +87,19 @@ export default function Contact() {
     setIsSubmitting(true);
 
     try {
+      // Validate form data
+      const validated = contactFormSchema.parse(formData);
+      
       const { error } = await supabase.from("service_requests").insert([
         {
-          name: formData.name,
-          company_name: formData.companyName || null,
-          email: formData.email,
-          phone: formData.phone,
-          state: formData.state,
-          farm_size_ha: formData.farmSize ? parseFloat(formData.farmSize) : null,
-          crop_type: formData.cropType || null,
-          message: formData.message || null,
+          name: validated.name,
+          company_name: validated.companyName || null,
+          email: validated.email,
+          phone: validated.phone,
+          state: validated.state,
+          farm_size_ha: validated.farmSize,
+          crop_type: validated.cropType || null,
+          message: validated.message || null,
         },
       ]);
 
@@ -104,7 +122,15 @@ export default function Contact() {
         message: "",
       });
     } catch (error) {
-      console.error("Error submitting request:", error);
+      if (error instanceof z.ZodError) {
+        toast({
+          title: "Validation Error",
+          description: error.errors[0].message,
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
       toast({
         title: "Submission Failed",
         description: "There was an error submitting your request. Please try again.",

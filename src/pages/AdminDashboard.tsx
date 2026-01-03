@@ -2,6 +2,41 @@ import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { z } from "zod";
+
+// Validation schemas
+const positiveNumberSchema = z.string()
+  .transform(val => parseFloat(val))
+  .refine(val => !isNaN(val) && val > 0, { message: 'Must be a positive number' });
+
+const optionalPositiveNumberSchema = z.string()
+  .transform(val => val ? parseFloat(val) : null)
+  .refine(val => val === null || (!isNaN(val) && val > 0), { message: 'Must be a positive number' });
+
+const farmSchema = z.object({
+  client_id: z.string().min(1, 'Client is required'),
+  farm_name: z.string().min(1, 'Farm name is required'),
+  location_description: z.string().optional(),
+  total_area_ha: positiveNumberSchema,
+  crop_type: z.string().optional(),
+});
+
+const fieldSchema = z.object({
+  farm_id: z.string().min(1, 'Farm is required'),
+  field_name: z.string().min(1, 'Field name is required'),
+  area_ha: positiveNumberSchema,
+});
+
+const soilSampleSchema = z.object({
+  field_id: z.string().min(1, 'Field is required'),
+  sampling_date: z.string().min(1, 'Sampling date is required'),
+  ph: optionalPositiveNumberSchema,
+  nitrogen: optionalPositiveNumberSchema,
+  phosphorus: optionalPositiveNumberSchema,
+  potassium: optionalPositiveNumberSchema,
+  organic_matter: optionalPositiveNumberSchema,
+  lab_name: z.string().optional(),
+});
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -226,96 +261,141 @@ export default function AdminDashboard() {
   const handleAddFarm = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const { error } = await supabase.from("farms").insert([{
-      ...newFarm,
-      total_area_ha: parseFloat(newFarm.total_area_ha),
-    }]);
+    try {
+      const validated = farmSchema.parse(newFarm);
+      
+      const { error } = await supabase.from("farms").insert([{
+        client_id: validated.client_id,
+        farm_name: validated.farm_name,
+        location_description: validated.location_description || null,
+        total_area_ha: validated.total_area_ha,
+        crop_type: validated.crop_type || null,
+      }]);
 
-    if (error) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Farm Added",
-        description: "New farm has been added successfully.",
-      });
-      setIsAddFarmOpen(false);
-      setNewFarm({
-        client_id: "",
-        farm_name: "",
-        location_description: "",
-        total_area_ha: "",
-        crop_type: "",
-      });
-      fetchData();
+      if (error) {
+        toast({
+          title: "Error",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Farm Added",
+          description: "New farm has been added successfully.",
+        });
+        setIsAddFarmOpen(false);
+        setNewFarm({
+          client_id: "",
+          farm_name: "",
+          location_description: "",
+          total_area_ha: "",
+          crop_type: "",
+        });
+        fetchData();
+      }
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        toast({
+          title: "Validation Error",
+          description: err.errors[0].message,
+          variant: "destructive",
+        });
+        return;
+      }
+      throw err;
     }
   };
 
   const handleAddField = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const { error } = await supabase.from("fields").insert([{
-      farm_id: newField.farm_id,
-      field_name: newField.field_name,
-      area_ha: parseFloat(newField.area_ha),
-    }]);
+    try {
+      const validated = fieldSchema.parse(newField);
+      
+      const { error } = await supabase.from("fields").insert([{
+        farm_id: validated.farm_id,
+        field_name: validated.field_name,
+        area_ha: validated.area_ha,
+      }]);
 
-    if (error) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Field Added",
-        description: "New field has been added successfully.",
-      });
-      setIsAddFieldOpen(false);
-      setNewField({ farm_id: "", field_name: "", area_ha: "" });
-      fetchData();
+      if (error) {
+        toast({
+          title: "Error",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Field Added",
+          description: "New field has been added successfully.",
+        });
+        setIsAddFieldOpen(false);
+        setNewField({ farm_id: "", field_name: "", area_ha: "" });
+        fetchData();
+      }
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        toast({
+          title: "Validation Error",
+          description: err.errors[0].message,
+          variant: "destructive",
+        });
+        return;
+      }
+      throw err;
     }
   };
 
   const handleUploadSoilSample = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const { error } = await supabase.from("soil_samples").insert([{
-      field_id: soilSample.field_id,
-      sampling_date: soilSample.sampling_date,
-      ph: soilSample.ph ? parseFloat(soilSample.ph) : null,
-      nitrogen: soilSample.nitrogen ? parseFloat(soilSample.nitrogen) : null,
-      phosphorus: soilSample.phosphorus ? parseFloat(soilSample.phosphorus) : null,
-      potassium: soilSample.potassium ? parseFloat(soilSample.potassium) : null,
-      organic_matter: soilSample.organic_matter ? parseFloat(soilSample.organic_matter) : null,
-      lab_name: soilSample.lab_name || null,
-    }]);
+    try {
+      const validated = soilSampleSchema.parse(soilSample);
+      
+      const { error } = await supabase.from("soil_samples").insert([{
+        field_id: validated.field_id,
+        sampling_date: validated.sampling_date,
+        ph: validated.ph,
+        nitrogen: validated.nitrogen,
+        phosphorus: validated.phosphorus,
+        potassium: validated.potassium,
+        organic_matter: validated.organic_matter,
+        lab_name: validated.lab_name || null,
+      }]);
 
-    if (error) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Soil Sample Added",
-        description: "Soil sample data has been uploaded successfully.",
-      });
-      setIsUploadSoilOpen(false);
-      setSoilSample({
-        field_id: "",
-        sampling_date: "",
-        ph: "",
-        nitrogen: "",
-        phosphorus: "",
-        potassium: "",
-        organic_matter: "",
-        lab_name: "",
-      });
+      if (error) {
+        toast({
+          title: "Error",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Soil Sample Added",
+          description: "Soil sample data has been uploaded successfully.",
+        });
+        setIsUploadSoilOpen(false);
+        setSoilSample({
+          field_id: "",
+          sampling_date: "",
+          ph: "",
+          nitrogen: "",
+          phosphorus: "",
+          potassium: "",
+          organic_matter: "",
+          lab_name: "",
+        });
+      }
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        toast({
+          title: "Validation Error",
+          description: err.errors[0].message,
+          variant: "destructive",
+        });
+        return;
+      }
+      throw err;
     }
   };
 
