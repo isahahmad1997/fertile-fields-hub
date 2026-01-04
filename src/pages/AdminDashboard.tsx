@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { getSafeErrorMessage } from "@/lib/error-handler";
 import { z } from "zod";
 
 // Validation schemas
@@ -201,7 +202,7 @@ export default function AdminDashboard() {
     if (error) {
       toast({
         title: "Error",
-        description: error.message,
+        description: getSafeErrorMessage(error),
         variant: "destructive",
       });
     } else {
@@ -244,7 +245,7 @@ export default function AdminDashboard() {
     if (error) {
       toast({
         title: "Error",
-        description: error.message,
+        description: getSafeErrorMessage(error),
         variant: "destructive",
       });
     } else {
@@ -275,7 +276,7 @@ export default function AdminDashboard() {
       if (error) {
         toast({
           title: "Error",
-          description: error.message,
+          description: getSafeErrorMessage(error),
           variant: "destructive",
         });
       } else {
@@ -321,7 +322,7 @@ export default function AdminDashboard() {
       if (error) {
         toast({
           title: "Error",
-          description: error.message,
+          description: getSafeErrorMessage(error),
           variant: "destructive",
         });
       } else {
@@ -366,7 +367,7 @@ export default function AdminDashboard() {
       if (error) {
         toast({
           title: "Error",
-          description: error.message,
+          description: getSafeErrorMessage(error),
           variant: "destructive",
         });
       } else {
@@ -412,7 +413,7 @@ export default function AdminDashboard() {
     if (error) {
       toast({
         title: "Error",
-        description: error.message,
+        description: getSafeErrorMessage(error),
         variant: "destructive",
       });
     } else {
