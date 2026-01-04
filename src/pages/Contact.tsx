@@ -16,6 +16,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Mail, Phone, MapPin, Clock, Send } from "lucide-react";
 import { z } from "zod";
 
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
 // Contact form validation schema
 const contactFormSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(100, "Name must be less than 100 characters"),
@@ -87,11 +90,12 @@ export default function Contact() {
     setIsSubmitting(true);
 
     try {
-      // Validate form data
+      // Client-side validation for immediate feedback
       const validated = contactFormSchema.parse(formData);
       
-      const { error } = await supabase.from("service_requests").insert([
-        {
+      // Call the edge function for server-side validation and insertion
+      const response = await supabase.functions.invoke('submit-service-request', {
+        body: {
           name: validated.name,
           company_name: validated.companyName || null,
           email: validated.email,
@@ -101,9 +105,15 @@ export default function Contact() {
           crop_type: validated.cropType || null,
           message: validated.message || null,
         },
-      ]);
+      });
 
-      if (error) throw error;
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to submit request');
+      }
+
+      if (response.data && !response.data.success) {
+        throw new Error(response.data.error || 'Failed to submit request');
+      }
 
       toast({
         title: "Request Submitted Successfully!",
@@ -131,9 +141,13 @@ export default function Contact() {
         setIsSubmitting(false);
         return;
       }
+      
+      const errorMessage = error instanceof Error ? error.message : "An error occurred";
       toast({
         title: "Submission Failed",
-        description: "There was an error submitting your request. Please try again.",
+        description: errorMessage === 'Failed to submit request' 
+          ? "There was an error submitting your request. Please try again."
+          : errorMessage,
         variant: "destructive",
       });
     } finally {
