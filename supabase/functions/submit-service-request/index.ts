@@ -19,6 +19,39 @@ const validStates = [
   "Taraba", "Yobe", "Zamfara"
 ];
 
+// Simple in-memory rate limiting (per-instance, resets on cold start)
+// For production, use a distributed solution like Upstash Redis
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+const RATE_LIMIT_MAX_REQUESTS = 5; // 5 requests per hour per IP
+
+function checkRateLimit(ip: string): { allowed: boolean; remaining: number } {
+  const now = Date.now();
+  const record = rateLimitMap.get(ip);
+
+  // Clean up expired entries periodically
+  if (rateLimitMap.size > 1000) {
+    for (const [key, value] of rateLimitMap.entries()) {
+      if (value.resetTime < now) {
+        rateLimitMap.delete(key);
+      }
+    }
+  }
+
+  if (!record || record.resetTime < now) {
+    // New window
+    rateLimitMap.set(ip, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS });
+    return { allowed: true, remaining: RATE_LIMIT_MAX_REQUESTS - 1 };
+  }
+
+  if (record.count >= RATE_LIMIT_MAX_REQUESTS) {
+    return { allowed: false, remaining: 0 };
+  }
+
+  record.count++;
+  return { allowed: true, remaining: RATE_LIMIT_MAX_REQUESTS - record.count };
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -26,6 +59,31 @@ serve(async (req) => {
   }
 
   try {
+    // Get client IP for rate limiting
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || 
+               req.headers.get("x-real-ip") || 
+               "unknown";
+    
+    // Check rate limit
+    const rateCheck = checkRateLimit(ip);
+    if (!rateCheck.allowed) {
+      console.log(`Rate limit exceeded for IP: ${ip}`);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: "Too many requests. Please try again later." 
+        }),
+        {
+          status: 429,
+          headers: { 
+            ...corsHeaders, 
+            "Content-Type": "application/json",
+            "Retry-After": "3600"
+          },
+        }
+      );
+    }
+
     const body = await req.json();
     const { name, email, phone, state, farm_size_ha, crop_type, message, company_name } = body;
 
@@ -111,6 +169,8 @@ serve(async (req) => {
       state,
       farm_size_ha: validatedFarmSize,
       crop_type: validatedCropType,
+      ip: ip,
+      remaining_requests: rateCheck.remaining,
     });
 
     const { error } = await supabase.from("service_requests").insert([
