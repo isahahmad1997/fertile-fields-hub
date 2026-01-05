@@ -76,6 +76,10 @@ export default function Index() {
             src={heroImage}
             alt="Aerial view of Nigerian farmland"
             className="w-full h-full object-cover"
+            width={1920}
+            height={1080}
+            fetchPriority="high"
+            decoding="async"
           />
           <div className="absolute inset-0 bg-gradient-to-r from-primary/95 via-primary/80 to-primary/40" />
         </div>
@@ -228,6 +232,10 @@ export default function Index() {
                   src={gisMapImage}
                   alt="GIS soil fertility map visualization"
                   className="w-full h-auto"
+                  width={1024}
+                  height={1024}
+                  loading="lazy"
+                  decoding="async"
                 />
               </div>
               <div className="absolute -bottom-6 -left-6 bg-card rounded-xl p-4 shadow-medium border border-border">
@@ -301,6 +309,10 @@ export default function Index() {
             src={soilSampleImage}
             alt="Rich fertile soil"
             className="w-full h-full object-cover"
+            width={1920}
+            height={1080}
+            loading="lazy"
+            decoding="async"
           />
           <div className="absolute inset-0 bg-gradient-to-r from-primary/95 to-primary/85" />
         </div>

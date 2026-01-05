@@ -153,6 +153,10 @@ export default function Services() {
                       src={service.image}
                       alt={service.title}
                       className="w-full h-auto object-cover"
+                      width={1024}
+                      height={1024}
+                      loading="lazy"
+                      decoding="async"
                     />
                   </div>
                 </div>
