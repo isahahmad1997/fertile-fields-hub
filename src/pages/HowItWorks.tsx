@@ -203,6 +203,10 @@ export default function HowItWorks() {
                   src={gisMapImage}
                   alt="GIS map deliverable example"
                   className="w-full h-auto"
+                  width={1024}
+                  height={1024}
+                  loading="lazy"
+                  decoding="async"
                 />
               </div>
               <div className="absolute -bottom-4 -right-4 bg-primary text-primary-foreground rounded-xl px-6 py-4 shadow-medium">
