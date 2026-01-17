@@ -144,6 +144,35 @@ export default function ClientDashboard() {
     return `${farm?.farm_name || "Unknown"} - ${field.field_name}`;
   };
 
+  const handleDownloadGisOutput = async (fileUrl: string, mapType: string) => {
+    try {
+      // Check if it's a storage path (new format) or a direct URL (legacy)
+      if (fileUrl.startsWith('gis-outputs/')) {
+        // Extract the path after 'gis-outputs/'
+        const filePath = fileUrl.replace('gis-outputs/', '');
+        
+        // Create a signed URL that expires in 1 hour
+        const { data, error } = await supabase.storage
+          .from('gis-outputs')
+          .createSignedUrl(filePath, 3600);
+        
+        if (error) {
+          console.error("Error creating signed URL:", error);
+          return;
+        }
+        
+        if (data?.signedUrl) {
+          window.open(data.signedUrl, '_blank');
+        }
+      } else {
+        // Legacy: direct URL
+        window.open(fileUrl, '_blank');
+      }
+    } catch (error) {
+      console.error("Error downloading file:", error);
+    }
+  };
+
   if (loading || loadingData) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-muted">
@@ -414,11 +443,14 @@ export default function ClientDashboard() {
                             <p className="text-xs text-muted-foreground">
                               Created: {new Date(output.created_at).toLocaleDateString()}
                             </p>
-                            <Button variant="outline" size="sm" className="w-full mt-2" asChild>
-                              <a href={output.file_url} target="_blank" rel="noopener noreferrer">
-                                <Download className="w-4 h-4 mr-2" />
-                                Download
-                              </a>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="w-full mt-2"
+                              onClick={() => handleDownloadGisOutput(output.file_url, output.map_type)}
+                            >
+                              <Download className="w-4 h-4 mr-2" />
+                              Download
                             </Button>
                           </div>
                         </CardContent>
