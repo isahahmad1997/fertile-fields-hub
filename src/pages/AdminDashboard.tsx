@@ -75,6 +75,7 @@ import {
   Upload,
   FlaskConical,
   Map,
+  Trash2,
 } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -83,6 +84,7 @@ type Farm = Database["public"]["Tables"]["farms"]["Row"];
 type ServiceRequest = Database["public"]["Tables"]["service_requests"]["Row"];
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 type Field = Database["public"]["Tables"]["fields"]["Row"];
+type GisOutput = Database["public"]["Tables"]["gis_outputs"]["Row"];
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -92,6 +94,7 @@ export default function AdminDashboard() {
   const [fields, setFields] = useState<Field[]>([]);
   const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [gisOutputs, setGisOutputs] = useState<GisOutput[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   
   // Dialog states
@@ -173,12 +176,13 @@ export default function AdminDashboard() {
 
   const fetchData = async () => {
     try {
-      const [clientsRes, farmsRes, fieldsRes, requestsRes, profilesRes] = await Promise.all([
+      const [clientsRes, farmsRes, fieldsRes, requestsRes, profilesRes, gisRes] = await Promise.all([
         supabase.from("clients").select("*").order("created_at", { ascending: false }),
         supabase.from("farms").select("*").order("created_at", { ascending: false }),
         supabase.from("fields").select("*").order("created_at", { ascending: false }),
         supabase.from("service_requests").select("*").order("created_at", { ascending: false }),
         supabase.from("profiles").select("*").order("created_at", { ascending: false }),
+        supabase.from("gis_outputs").select("*").order("created_at", { ascending: false }),
       ]);
 
       setClients(clientsRes.data || []);
@@ -186,6 +190,7 @@ export default function AdminDashboard() {
       setFields(fieldsRes.data || []);
       setServiceRequests(requestsRes.data || []);
       setProfiles(profilesRes.data || []);
+      setGisOutputs(gisRes.data || []);
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
@@ -537,6 +542,58 @@ export default function AdminDashboard() {
     if (!userId) return null;
     const profile = profiles.find(p => p.id === userId);
     return profile?.email || null;
+  };
+
+  const getFieldName = (fieldId: string) => {
+    const field = fields.find(f => f.id === fieldId);
+    if (!field) return "Unknown Field";
+    const farm = farms.find(f => f.id === field.farm_id);
+    return `${farm?.farm_name || "Unknown"} - ${field.field_name}`;
+  };
+
+  const handleDeleteGisOutput = async (output: GisOutput) => {
+    if (!confirm(`Are you sure you want to delete this ${output.map_type} map?`)) {
+      return;
+    }
+
+    try {
+      // Delete from storage if it's a storage path
+      if (output.file_url.startsWith('gis-outputs/')) {
+        const filePath = output.file_url.replace('gis-outputs/', '');
+        const { error: storageError } = await supabase.storage
+          .from('gis-outputs')
+          .remove([filePath]);
+        
+        if (storageError) {
+          console.error("Error deleting file from storage:", storageError);
+          // Continue to delete DB record even if storage deletion fails
+        }
+      }
+
+      // Delete from database
+      const { error: dbError } = await supabase
+        .from("gis_outputs")
+        .delete()
+        .eq("id", output.id);
+
+      if (dbError) {
+        throw dbError;
+      }
+
+      toast({
+        title: "Map Deleted",
+        description: "GIS output has been deleted successfully.",
+      });
+
+      // Refresh data
+      fetchData();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: getSafeErrorMessage(error),
+        variant: "destructive",
+      });
+    }
   };
 
   if (loading || loadingData) {
@@ -1325,7 +1382,7 @@ export default function AdminDashboard() {
                     Upload maps and GIS data for client fields
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-4">
                   <Dialog open={isUploadGisOpen} onOpenChange={setIsUploadGisOpen}>
                     <DialogTrigger asChild>
                       <Button className="w-full">
@@ -1428,6 +1485,53 @@ export default function AdminDashboard() {
                       </form>
                     </DialogContent>
                   </Dialog>
+
+                  {/* List of existing GIS outputs */}
+                  {gisOutputs.length > 0 && (
+                    <div className="space-y-2 pt-4 border-t">
+                      <p className="text-sm font-medium text-muted-foreground mb-3">
+                        Uploaded Maps ({gisOutputs.length})
+                      </p>
+                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                        {gisOutputs.map((output) => (
+                          <div
+                            key={output.id}
+                            className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border border-border"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                  output.map_type === "N" ? "bg-green-500/10 text-green-600" :
+                                  output.map_type === "P" ? "bg-blue-500/10 text-blue-600" :
+                                  output.map_type === "K" ? "bg-amber-500/10 text-amber-600" :
+                                  output.map_type === "pH" ? "bg-red-500/10 text-red-600" :
+                                  "bg-purple-500/10 text-purple-600"
+                                }`}>
+                                  {output.map_type}
+                                </span>
+                                <span className="text-sm font-medium truncate">
+                                  {getFieldName(output.field_id)}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                                {output.season && <span>{output.season}</span>}
+                                <span>•</span>
+                                <span>{new Date(output.created_at).toLocaleDateString()}</span>
+                              </div>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => handleDeleteGisOutput(output)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
