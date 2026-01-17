@@ -151,6 +151,10 @@ export default function AdminDashboard() {
     season: "",
     file_url: "",
   });
+  
+  // File upload state
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -403,24 +407,76 @@ export default function AdminDashboard() {
   const handleUploadGisOutput = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const { error } = await supabase.from("gis_outputs").insert([{
-      field_id: gisOutput.field_id,
-      map_type: gisOutput.map_type,
-      season: gisOutput.season || null,
-      file_url: gisOutput.file_url,
-    }]);
-
-    if (error) {
+    if (!gisOutput.field_id) {
       toast({
-        title: "Error",
-        description: getSafeErrorMessage(error),
+        title: "Validation Error",
+        description: "Please select a field",
         variant: "destructive",
       });
-    } else {
+      return;
+    }
+
+    if (!selectedFile) {
       toast({
-        title: "GIS Output Added",
-        description: "GIS output has been uploaded successfully.",
+        title: "Validation Error",
+        description: "Please select a map file to upload",
+        variant: "destructive",
       });
+      return;
+    }
+
+    setUploading(true);
+    
+    try {
+      // Get the client_id for organizing files
+      const field = fields.find(f => f.id === gisOutput.field_id);
+      const farm = farms.find(f => f.id === field?.farm_id);
+      const client = clients.find(c => c.id === farm?.client_id);
+      
+      if (!client) {
+        throw new Error("Could not find client for this field");
+      }
+
+      // Create a unique file name with proper folder structure
+      const fileExt = selectedFile.name.split('.').pop()?.toLowerCase() || 'pdf';
+      const timestamp = Date.now();
+      const sanitizedFileName = selectedFile.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const filePath = `${client.id}/${gisOutput.field_id}/${gisOutput.map_type}_${timestamp}_${sanitizedFileName}`;
+
+      // Upload file to storage
+      const { error: uploadError } = await supabase.storage
+        .from('gis-outputs')
+        .upload(filePath, selectedFile, {
+          cacheControl: '3600',
+          upsert: false,
+        });
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      // Store the file path as the URL (will be used to generate signed URLs when downloading)
+      const fileUrl = `gis-outputs/${filePath}`;
+
+      // Insert record into gis_outputs table
+      const { error: dbError } = await supabase.from("gis_outputs").insert([{
+        field_id: gisOutput.field_id,
+        map_type: gisOutput.map_type,
+        season: gisOutput.season || null,
+        file_url: fileUrl,
+      }]);
+
+      if (dbError) {
+        // If DB insert fails, try to delete the uploaded file
+        await supabase.storage.from('gis-outputs').remove([filePath]);
+        throw dbError;
+      }
+
+      toast({
+        title: "Map Uploaded",
+        description: `${gisOutput.map_type} map has been uploaded successfully.`,
+      });
+      
       setIsUploadGisOpen(false);
       setGisOutput({
         field_id: "",
@@ -428,6 +484,42 @@ export default function AdminDashboard() {
         season: "",
         file_url: "",
       });
+      setSelectedFile(null);
+      
+    } catch (error) {
+      toast({
+        title: "Upload Error",
+        description: getSafeErrorMessage(error),
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      const allowedTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg', 'image/tiff'];
+      if (!allowedTypes.includes(file.type)) {
+        toast({
+          title: "Invalid File Type",
+          description: "Please upload a PDF, PNG, JPG, or TIFF file",
+          variant: "destructive",
+        });
+        return;
+      }
+      // Validate file size (max 50MB)
+      if (file.size > 50 * 1024 * 1024) {
+        toast({
+          title: "File Too Large",
+          description: "Maximum file size is 50MB",
+          variant: "destructive",
+        });
+        return;
+      }
+      setSelectedFile(file);
     }
   };
 
@@ -1305,18 +1397,33 @@ export default function AdminDashboard() {
                           </div>
                         </div>
                         <div className="space-y-2">
-                          <Label>File URL</Label>
-                          <Input
-                            value={gisOutput.file_url}
-                            onChange={(e) =>
-                              setGisOutput({ ...gisOutput, file_url: e.target.value })
-                            }
-                            placeholder="https://..."
-                            required
-                          />
+                          <Label>Map File (PDF, PNG, JPG, TIFF)</Label>
+                          <div className="flex flex-col gap-2">
+                            <Input
+                              type="file"
+                              accept=".pdf,.png,.jpg,.jpeg,.tiff,.tif"
+                              onChange={handleFileChange}
+                              className="cursor-pointer"
+                            />
+                            {selectedFile && (
+                              <p className="text-sm text-muted-foreground">
+                                Selected: {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+                              </p>
+                            )}
+                          </div>
                         </div>
-                        <Button type="submit" className="w-full">
-                          Upload GIS Output
+                        <Button type="submit" className="w-full" disabled={uploading}>
+                          {uploading ? (
+                            <>
+                              <span className="animate-spin mr-2">⟳</span>
+                              Uploading...
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-4 h-4 mr-2" />
+                              Upload Map
+                            </>
+                          )}
                         </Button>
                       </form>
                     </DialogContent>
