@@ -38,6 +38,8 @@ import {
   Edit,
   Shield,
   ChevronDown,
+  Trash2,
+  Plus,
 } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -67,6 +69,14 @@ export default function ClientDashboard() {
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [isEditClientOpen, setIsEditClientOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<ClientData | null>(null);
+  
+  // Edit dialogs state
+  const [isEditSoilSampleOpen, setIsEditSoilSampleOpen] = useState(false);
+  const [editingSoilSample, setEditingSoilSample] = useState<SoilSample | null>(null);
+  const [isEditGisOutputOpen, setIsEditGisOutputOpen] = useState(false);
+  const [editingGisOutput, setEditingGisOutput] = useState<GisOutput | null>(null);
+  const [isEditServiceOpen, setIsEditServiceOpen] = useState(false);
+  const [editingService, setEditingService] = useState<Service | null>(null);
 
   // Get client_id from URL if admin is viewing a specific client
   const viewingClientId = searchParams.get("client_id");
@@ -239,6 +249,124 @@ export default function ClientDashboard() {
       setIsEditClientOpen(false);
       setClientData(editingClient);
       setEditingClient(null);
+    }
+  };
+
+  // Handle edit soil sample
+  const handleEditSoilSample = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSoilSample) return;
+
+    const { error } = await supabase
+      .from("soil_samples")
+      .update({
+        sampling_date: editingSoilSample.sampling_date,
+        ph: editingSoilSample.ph,
+        nitrogen: editingSoilSample.nitrogen,
+        phosphorus: editingSoilSample.phosphorus,
+        potassium: editingSoilSample.potassium,
+        organic_matter: editingSoilSample.organic_matter,
+        lab_name: editingSoilSample.lab_name,
+      })
+      .eq("id", editingSoilSample.id);
+
+    if (error) {
+      toast({ title: "Error", description: getSafeErrorMessage(error), variant: "destructive" });
+    } else {
+      toast({ title: "Soil Sample Updated", description: "Soil sample has been updated successfully." });
+      setIsEditSoilSampleOpen(false);
+      setSoilSamples(prev => prev.map(s => s.id === editingSoilSample.id ? editingSoilSample : s));
+      setEditingSoilSample(null);
+    }
+  };
+
+  const handleDeleteSoilSample = async (sampleId: string) => {
+    if (!confirm("Are you sure you want to delete this soil sample?")) return;
+
+    const { error } = await supabase.from("soil_samples").delete().eq("id", sampleId);
+    if (error) {
+      toast({ title: "Error", description: getSafeErrorMessage(error), variant: "destructive" });
+    } else {
+      toast({ title: "Deleted", description: "Soil sample has been deleted." });
+      setSoilSamples(prev => prev.filter(s => s.id !== sampleId));
+    }
+  };
+
+  // Handle edit GIS output
+  const handleEditGisOutput = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingGisOutput) return;
+
+    const { error } = await supabase
+      .from("gis_outputs")
+      .update({
+        map_type: editingGisOutput.map_type,
+        season: editingGisOutput.season,
+      })
+      .eq("id", editingGisOutput.id);
+
+    if (error) {
+      toast({ title: "Error", description: getSafeErrorMessage(error), variant: "destructive" });
+    } else {
+      toast({ title: "GIS Output Updated", description: "GIS output has been updated successfully." });
+      setIsEditGisOutputOpen(false);
+      setGisOutputs(prev => prev.map(g => g.id === editingGisOutput.id ? editingGisOutput : g));
+      setEditingGisOutput(null);
+    }
+  };
+
+  const handleDeleteGisOutput = async (output: GisOutput) => {
+    if (!confirm("Are you sure you want to delete this GIS output?")) return;
+
+    // Delete file from storage if it's a storage path
+    if (output.file_url.startsWith('gis-outputs/')) {
+      const filePath = output.file_url.replace('gis-outputs/', '');
+      await supabase.storage.from('gis-outputs').remove([filePath]);
+    }
+
+    const { error } = await supabase.from("gis_outputs").delete().eq("id", output.id);
+    if (error) {
+      toast({ title: "Error", description: getSafeErrorMessage(error), variant: "destructive" });
+    } else {
+      toast({ title: "Deleted", description: "GIS output has been deleted." });
+      setGisOutputs(prev => prev.filter(g => g.id !== output.id));
+    }
+  };
+
+  // Handle edit service
+  const handleEditService = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingService) return;
+
+    const { error } = await supabase
+      .from("services")
+      .update({
+        service_type: editingService.service_type,
+        status: editingService.status,
+        area_covered_ha: editingService.area_covered_ha,
+        cost: editingService.cost,
+      })
+      .eq("id", editingService.id);
+
+    if (error) {
+      toast({ title: "Error", description: getSafeErrorMessage(error), variant: "destructive" });
+    } else {
+      toast({ title: "Service Updated", description: "Service has been updated successfully." });
+      setIsEditServiceOpen(false);
+      setServices(prev => prev.map(s => s.id === editingService.id ? editingService : s));
+      setEditingService(null);
+    }
+  };
+
+  const handleDeleteService = async (serviceId: string) => {
+    if (!confirm("Are you sure you want to delete this service?")) return;
+
+    const { error } = await supabase.from("services").delete().eq("id", serviceId);
+    if (error) {
+      toast({ title: "Error", description: getSafeErrorMessage(error), variant: "destructive" });
+    } else {
+      toast({ title: "Deleted", description: "Service has been deleted." });
+      setServices(prev => prev.filter(s => s.id !== serviceId));
     }
   };
 
@@ -560,6 +688,7 @@ export default function ClientDashboard() {
                           <th className="text-left py-3 px-4 font-medium">K</th>
                           <th className="text-left py-3 px-4 font-medium">OM %</th>
                           <th className="text-left py-3 px-4 font-medium">Lab</th>
+                          {isAdmin && <th className="text-left py-3 px-4 font-medium">Actions</th>}
                         </tr>
                       </thead>
                       <tbody>
@@ -575,6 +704,30 @@ export default function ClientDashboard() {
                             <td className="py-3 px-4 text-sm">{sample.potassium ?? "-"}</td>
                             <td className="py-3 px-4 text-sm">{sample.organic_matter ?? "-"}</td>
                             <td className="py-3 px-4 text-sm">{sample.lab_name || "-"}</td>
+                            {isAdmin && (
+                              <td className="py-3 px-4 text-sm">
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setEditingSoilSample(sample);
+                                      setIsEditSoilSampleOpen(true);
+                                    }}
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDeleteSoilSample(sample.id)}
+                                    className="text-destructive hover:text-destructive"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </td>
+                            )}
                           </tr>
                         ))}
                       </tbody>
@@ -605,17 +758,41 @@ export default function ClientDashboard() {
                     {gisOutputs.map((output) => (
                       <Card key={output.id} className="bg-muted/50">
                         <CardHeader className="pb-2">
-                          <CardTitle className="text-base flex items-center gap-2">
-                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                              output.map_type === "N" ? "bg-green-500/10 text-green-600" :
-                              output.map_type === "P" ? "bg-blue-500/10 text-blue-600" :
-                              output.map_type === "K" ? "bg-amber-500/10 text-amber-600" :
-                              output.map_type === "pH" ? "bg-red-500/10 text-red-600" :
-                              "bg-purple-500/10 text-purple-600"
-                            }`}>
-                              {output.map_type}
-                            </span>
-                          </CardTitle>
+                          <div className="flex items-center justify-between">
+                            <CardTitle className="text-base flex items-center gap-2">
+                              <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                output.map_type === "N" ? "bg-green-500/10 text-green-600" :
+                                output.map_type === "P" ? "bg-blue-500/10 text-blue-600" :
+                                output.map_type === "K" ? "bg-amber-500/10 text-amber-600" :
+                                output.map_type === "pH" ? "bg-red-500/10 text-red-600" :
+                                "bg-purple-500/10 text-purple-600"
+                              }`}>
+                                {output.map_type}
+                              </span>
+                            </CardTitle>
+                            {isAdmin && (
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setEditingGisOutput(output);
+                                    setIsEditGisOutputOpen(true);
+                                  }}
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteGisOutput(output)}
+                                  className="text-destructive hover:text-destructive"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            )}
+                          </div>
                           <CardDescription>
                             {getFieldName(output.field_id)}
                           </CardDescription>
@@ -677,9 +854,10 @@ export default function ClientDashboard() {
                           <p className="text-sm text-muted-foreground">
                             {new Date(service.created_at).toLocaleDateString()}
                             {service.area_covered_ha && ` • ${service.area_covered_ha} ha`}
+                            {service.cost && ` • ₦${Number(service.cost).toLocaleString()}`}
                           </p>
                         </div>
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
                           <span
                             className={`px-3 py-1 rounded-full text-xs font-medium ${
                               service.status === "Completed"
@@ -691,6 +869,28 @@ export default function ClientDashboard() {
                           >
                             {service.status}
                           </span>
+                          {isAdmin && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setEditingService(service);
+                                  setIsEditServiceOpen(true);
+                                }}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteService(service.id)}
+                                className="text-destructive hover:text-destructive"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </>
+                          )}
                           {service.status === "Completed" && (
                             <Button variant="ghost" size="sm">
                               <Download className="w-4 h-4" />
@@ -841,6 +1041,246 @@ export default function ClientDashboard() {
                     variant="outline"
                     onClick={() => setIsEditClientOpen(false)}
                   >
+                    Cancel
+                  </Button>
+                  <Button type="submit">Save Changes</Button>
+                </div>
+              </form>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Soil Sample Dialog */}
+        <Dialog open={isEditSoilSampleOpen} onOpenChange={setIsEditSoilSampleOpen}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Edit Soil Sample</DialogTitle>
+              <DialogDescription>
+                Update soil lab results
+              </DialogDescription>
+            </DialogHeader>
+            {editingSoilSample && (
+              <form onSubmit={handleEditSoilSample} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-sample-date">Sampling Date</Label>
+                    <Input
+                      id="edit-sample-date"
+                      type="date"
+                      value={editingSoilSample.sampling_date}
+                      onChange={(e) =>
+                        setEditingSoilSample({ ...editingSoilSample, sampling_date: e.target.value })
+                      }
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-sample-lab">Lab Name</Label>
+                    <Input
+                      id="edit-sample-lab"
+                      value={editingSoilSample.lab_name || ""}
+                      onChange={(e) =>
+                        setEditingSoilSample({ ...editingSoilSample, lab_name: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-sample-ph">pH</Label>
+                    <Input
+                      id="edit-sample-ph"
+                      type="number"
+                      step="0.1"
+                      value={editingSoilSample.ph ?? ""}
+                      onChange={(e) =>
+                        setEditingSoilSample({ ...editingSoilSample, ph: e.target.value ? parseFloat(e.target.value) : null })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-sample-n">Nitrogen (N)</Label>
+                    <Input
+                      id="edit-sample-n"
+                      type="number"
+                      step="0.1"
+                      value={editingSoilSample.nitrogen ?? ""}
+                      onChange={(e) =>
+                        setEditingSoilSample({ ...editingSoilSample, nitrogen: e.target.value ? parseFloat(e.target.value) : null })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-sample-p">Phosphorus (P)</Label>
+                    <Input
+                      id="edit-sample-p"
+                      type="number"
+                      step="0.1"
+                      value={editingSoilSample.phosphorus ?? ""}
+                      onChange={(e) =>
+                        setEditingSoilSample({ ...editingSoilSample, phosphorus: e.target.value ? parseFloat(e.target.value) : null })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-sample-k">Potassium (K)</Label>
+                    <Input
+                      id="edit-sample-k"
+                      type="number"
+                      step="0.1"
+                      value={editingSoilSample.potassium ?? ""}
+                      onChange={(e) =>
+                        setEditingSoilSample({ ...editingSoilSample, potassium: e.target.value ? parseFloat(e.target.value) : null })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-sample-om">Organic Matter (%)</Label>
+                    <Input
+                      id="edit-sample-om"
+                      type="number"
+                      step="0.1"
+                      value={editingSoilSample.organic_matter ?? ""}
+                      onChange={(e) =>
+                        setEditingSoilSample({ ...editingSoilSample, organic_matter: e.target.value ? parseFloat(e.target.value) : null })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button type="button" variant="outline" onClick={() => setIsEditSoilSampleOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit">Save Changes</Button>
+                </div>
+              </form>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit GIS Output Dialog */}
+        <Dialog open={isEditGisOutputOpen} onOpenChange={setIsEditGisOutputOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit GIS Output</DialogTitle>
+              <DialogDescription>
+                Update map details
+              </DialogDescription>
+            </DialogHeader>
+            {editingGisOutput && (
+              <form onSubmit={handleEditGisOutput} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-gis-type">Map Type</Label>
+                  <Select
+                    value={editingGisOutput.map_type}
+                    onValueChange={(value: "N" | "P" | "K" | "pH" | "VRA") =>
+                      setEditingGisOutput({ ...editingGisOutput, map_type: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="N">Nitrogen (N)</SelectItem>
+                      <SelectItem value="P">Phosphorus (P)</SelectItem>
+                      <SelectItem value="K">Potassium (K)</SelectItem>
+                      <SelectItem value="pH">pH</SelectItem>
+                      <SelectItem value="VRA">Variable Rate Application (VRA)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-gis-season">Season</Label>
+                  <Input
+                    id="edit-gis-season"
+                    value={editingGisOutput.season || ""}
+                    onChange={(e) =>
+                      setEditingGisOutput({ ...editingGisOutput, season: e.target.value || null })
+                    }
+                    placeholder="e.g., 2025"
+                  />
+                </div>
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button type="button" variant="outline" onClick={() => setIsEditGisOutputOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit">Save Changes</Button>
+                </div>
+              </form>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Service Dialog */}
+        <Dialog open={isEditServiceOpen} onOpenChange={setIsEditServiceOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit Service</DialogTitle>
+              <DialogDescription>
+                Update service details
+              </DialogDescription>
+            </DialogHeader>
+            {editingService && (
+              <form onSubmit={handleEditService} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-service-type">Service Type</Label>
+                  <Input
+                    id="edit-service-type"
+                    value={editingService.service_type}
+                    onChange={(e) =>
+                      setEditingService({ ...editingService, service_type: e.target.value })
+                    }
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-service-status">Status</Label>
+                  <Select
+                    value={editingService.status}
+                    onValueChange={(value: "Pending" | "InProgress" | "Completed") =>
+                      setEditingService({ ...editingService, status: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Pending">Pending</SelectItem>
+                      <SelectItem value="InProgress">In Progress</SelectItem>
+                      <SelectItem value="Completed">Completed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-service-area">Area (ha)</Label>
+                    <Input
+                      id="edit-service-area"
+                      type="number"
+                      step="0.1"
+                      value={editingService.area_covered_ha ?? ""}
+                      onChange={(e) =>
+                        setEditingService({ ...editingService, area_covered_ha: e.target.value ? parseFloat(e.target.value) : null })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-service-cost">Cost (₦)</Label>
+                    <Input
+                      id="edit-service-cost"
+                      type="number"
+                      step="0.01"
+                      value={editingService.cost ?? ""}
+                      onChange={(e) =>
+                        setEditingService({ ...editingService, cost: e.target.value ? parseFloat(e.target.value) : null })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button type="button" variant="outline" onClick={() => setIsEditServiceOpen(false)}>
                     Cancel
                   </Button>
                   <Button type="submit">Save Changes</Button>
