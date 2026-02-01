@@ -1,9 +1,27 @@
 import { useEffect, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { getSafeErrorMessage } from "@/lib/error-handler";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { toast } from "@/hooks/use-toast";
 import {
   Leaf,
   LogOut,
@@ -17,6 +35,9 @@ import {
   FlaskConical,
   Map,
   Layers,
+  Edit,
+  Shield,
+  ChevronDown,
 } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -30,6 +51,7 @@ type GisOutput = Database["public"]["Tables"]["gis_outputs"]["Row"];
 
 export default function ClientDashboard() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user, loading, signOut, isAdmin } = useAuth();
   const [clientData, setClientData] = useState<ClientData | null>(null);
   const [farms, setFarms] = useState<Farm[]>([]);
@@ -39,21 +61,72 @@ export default function ClientDashboard() {
   const [soilSamples, setSoilSamples] = useState<SoilSample[]>([]);
   const [gisOutputs, setGisOutputs] = useState<GisOutput[]>([]);
   const [loadingData, setLoadingData] = useState(true);
+  
+  // Admin-specific state
+  const [allClients, setAllClients] = useState<ClientData[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [isEditClientOpen, setIsEditClientOpen] = useState(false);
+  const [editingClient, setEditingClient] = useState<ClientData | null>(null);
+
+  // Get client_id from URL if admin is viewing a specific client
+  const viewingClientId = searchParams.get("client_id");
 
   useEffect(() => {
     if (!loading && !user) {
       navigate("/login");
     }
-    if (!loading && user && isAdmin) {
-      navigate("/admin");
+  }, [user, loading, navigate]);
+
+  // Fetch all clients for admin selector
+  useEffect(() => {
+    if (user && isAdmin) {
+      fetchAllClients();
     }
-  }, [user, loading, isAdmin, navigate]);
+  }, [user, isAdmin]);
 
   useEffect(() => {
     if (user) {
-      fetchClientData();
+      if (isAdmin && viewingClientId) {
+        fetchClientDataById(viewingClientId);
+      } else if (isAdmin && !viewingClientId) {
+        // Admin viewing without specific client - show client selector
+        setLoadingData(false);
+      } else {
+        fetchClientData();
+      }
     }
-  }, [user]);
+  }, [user, isAdmin, viewingClientId]);
+
+  const fetchAllClients = async () => {
+    try {
+      const { data } = await supabase
+        .from("clients")
+        .select("*")
+        .order("company_name", { ascending: true });
+      setAllClients(data || []);
+    } catch (error) {
+      console.error("Error fetching clients:", error);
+    }
+  };
+
+  const fetchClientDataById = async (clientId: string) => {
+    try {
+      const { data: client } = await supabase
+        .from("clients")
+        .select("*")
+        .eq("id", clientId)
+        .maybeSingle();
+
+      if (client) {
+        setClientData(client);
+        await fetchRelatedData(client.id);
+      }
+    } catch (error) {
+      console.error("Error fetching client data:", error);
+    } finally {
+      setLoadingData(false);
+    }
+  };
 
   const fetchClientData = async () => {
     try {
@@ -66,70 +139,112 @@ export default function ClientDashboard() {
 
       if (client) {
         setClientData(client);
-
-        // Fetch farms
-        const { data: farmsData } = await supabase
-          .from("farms")
-          .select("*")
-          .eq("client_id", client.id);
-
-        setFarms(farmsData || []);
-
-        // Fetch fields for all farms
-        if (farmsData && farmsData.length > 0) {
-          const farmIds = farmsData.map(f => f.id);
-          const { data: fieldsData } = await supabase
-            .from("fields")
-            .select("*")
-            .in("farm_id", farmIds);
-
-          setFields(fieldsData || []);
-
-          // Fetch soil samples for all fields
-          if (fieldsData && fieldsData.length > 0) {
-            const fieldIds = fieldsData.map(f => f.id);
-            const [soilRes, gisRes] = await Promise.all([
-              supabase
-                .from("soil_samples")
-                .select("*")
-                .in("field_id", fieldIds)
-                .order("sampling_date", { ascending: false }),
-              supabase
-                .from("gis_outputs")
-                .select("*")
-                .in("field_id", fieldIds)
-                .order("created_at", { ascending: false }),
-            ]);
-
-            setSoilSamples(soilRes.data || []);
-            setGisOutputs(gisRes.data || []);
-          }
-        }
-
-        // Fetch services
-        const { data: servicesData } = await supabase
-          .from("services")
-          .select("*")
-          .eq("client_id", client.id)
-          .order("created_at", { ascending: false });
-
-        setServices(servicesData || []);
-
-        // Fetch subscription
-        const { data: subData } = await supabase
-          .from("subscriptions")
-          .select("*")
-          .eq("client_id", client.id)
-          .eq("status", "Active")
-          .maybeSingle();
-
-        setSubscription(subData);
+        await fetchRelatedData(client.id);
       }
     } catch (error) {
       console.error("Error fetching client data:", error);
     } finally {
       setLoadingData(false);
     }
+  };
+
+  const fetchRelatedData = async (clientId: string) => {
+    // Fetch farms
+    const { data: farmsData } = await supabase
+      .from("farms")
+      .select("*")
+      .eq("client_id", clientId);
+
+    setFarms(farmsData || []);
+
+    // Fetch fields for all farms
+    if (farmsData && farmsData.length > 0) {
+      const farmIds = farmsData.map(f => f.id);
+      const { data: fieldsData } = await supabase
+        .from("fields")
+        .select("*")
+        .in("farm_id", farmIds);
+
+      setFields(fieldsData || []);
+
+      // Fetch soil samples and GIS outputs for all fields
+      if (fieldsData && fieldsData.length > 0) {
+        const fieldIds = fieldsData.map(f => f.id);
+        const [soilRes, gisRes] = await Promise.all([
+          supabase
+            .from("soil_samples")
+            .select("*")
+            .in("field_id", fieldIds)
+            .order("sampling_date", { ascending: false }),
+          supabase
+            .from("gis_outputs")
+            .select("*")
+            .in("field_id", fieldIds)
+            .order("created_at", { ascending: false }),
+        ]);
+
+        setSoilSamples(soilRes.data || []);
+        setGisOutputs(gisRes.data || []);
+      }
+    }
+
+    // Fetch services
+    const { data: servicesData } = await supabase
+      .from("services")
+      .select("*")
+      .eq("client_id", clientId)
+      .order("created_at", { ascending: false });
+
+    setServices(servicesData || []);
+
+    // Fetch subscription
+    const { data: subData } = await supabase
+      .from("subscriptions")
+      .select("*")
+      .eq("client_id", clientId)
+      .eq("status", "Active")
+      .maybeSingle();
+
+    setSubscription(subData);
+  };
+
+  const handleEditClient = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingClient) return;
+
+    const { error } = await supabase
+      .from("clients")
+      .update({
+        company_name: editingClient.company_name,
+        contact_person: editingClient.contact_person,
+        email: editingClient.email,
+        phone: editingClient.phone,
+        state: editingClient.state,
+        client_type: editingClient.client_type,
+        is_active: editingClient.is_active,
+      })
+      .eq("id", editingClient.id);
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: getSafeErrorMessage(error),
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Client Updated",
+        description: "Client has been updated successfully.",
+      });
+      setIsEditClientOpen(false);
+      setClientData(editingClient);
+      setEditingClient(null);
+    }
+  };
+
+  const handleSelectClient = (clientId: string) => {
+    setSelectedClientId(clientId);
+    setSearchParams({ client_id: clientId });
   };
 
   const handleSignOut = async () => {
@@ -199,6 +314,14 @@ export default function ClientDashboard() {
             </Link>
 
             <div className="flex items-center gap-4">
+              {isAdmin && (
+                <Button variant="outline" size="sm" asChild>
+                  <Link to="/admin">
+                    <Shield className="w-4 h-4 mr-2" />
+                    Admin Panel
+                  </Link>
+                </Button>
+              )}
               <Button variant="ghost" size="sm" asChild>
                 <Link to="/">
                   <Home className="w-4 h-4 mr-2" />
@@ -216,17 +339,82 @@ export default function ClientDashboard() {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 lg:px-8 py-8">
-        {/* Welcome */}
-        <div className="mb-8">
-          <h1 className="font-serif text-2xl lg:text-3xl font-bold text-foreground mb-2">
-            Welcome, {clientData?.contact_person || user?.email}
-          </h1>
-          <p className="text-muted-foreground">
-            {clientData ? clientData.company_name : "Manage your farms and view your soil data"}
-          </p>
-        </div>
+        {/* Admin Client Selector */}
+        {isAdmin && !viewingClientId && (
+          <Card className="mb-8">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="w-5 h-5" />
+                Admin View - Select a Client
+              </CardTitle>
+              <CardDescription>
+                Select a client to view and manage their dashboard
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="max-w-md">
+                <Select onValueChange={handleSelectClient}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a client..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allClients.map((client) => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.company_name} - {client.contact_person}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-        {!clientData ? (
+        {/* Admin indicator when viewing specific client */}
+        {isAdmin && viewingClientId && clientData && (
+          <div className="mb-4 flex items-center gap-2 text-sm">
+            <Shield className="w-4 h-4 text-primary" />
+            <span className="text-muted-foreground">Admin viewing:</span>
+            <span className="font-medium">{clientData.company_name}</span>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setSearchParams({})}
+              className="ml-2"
+            >
+              ← Back to client list
+            </Button>
+          </div>
+        )}
+
+        {/* Welcome */}
+        {(clientData || (!isAdmin && !viewingClientId)) && (
+          <div className="mb-8 flex items-center justify-between">
+            <div>
+              <h1 className="font-serif text-2xl lg:text-3xl font-bold text-foreground mb-2">
+                {isAdmin && clientData ? `${clientData.contact_person}'s Dashboard` : `Welcome, ${clientData?.contact_person || user?.email}`}
+              </h1>
+              <p className="text-muted-foreground">
+                {clientData ? clientData.company_name : "Manage your farms and view your soil data"}
+              </p>
+            </div>
+            {isAdmin && clientData && (
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  setEditingClient(clientData);
+                  setIsEditClientOpen(true);
+                }}
+              >
+                <Edit className="w-4 h-4 mr-2" />
+                Edit Client
+              </Button>
+            )}
+          </div>
+        )}
+
+        {!clientData && !isAdmin ? (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -243,7 +431,7 @@ export default function ClientDashboard() {
               </Button>
             </CardContent>
           </Card>
-        ) : (
+        ) : clientData ? (
           <>
             {/* Stats Grid */}
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -542,7 +730,125 @@ export default function ClientDashboard() {
               </Card>
             )}
           </>
-        )}
+        ) : null}
+
+        {/* Edit Client Dialog */}
+        <Dialog open={isEditClientOpen} onOpenChange={setIsEditClientOpen}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Edit Client</DialogTitle>
+              <DialogDescription>
+                Update client information
+              </DialogDescription>
+            </DialogHeader>
+            {editingClient && (
+              <form onSubmit={handleEditClient} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-company">Company Name</Label>
+                    <Input
+                      id="edit-company"
+                      value={editingClient.company_name}
+                      onChange={(e) =>
+                        setEditingClient({ ...editingClient, company_name: e.target.value })
+                      }
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-contact">Contact Person</Label>
+                    <Input
+                      id="edit-contact"
+                      value={editingClient.contact_person}
+                      onChange={(e) =>
+                        setEditingClient({ ...editingClient, contact_person: e.target.value })
+                      }
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-email">Email</Label>
+                    <Input
+                      id="edit-email"
+                      type="email"
+                      value={editingClient.email}
+                      onChange={(e) =>
+                        setEditingClient({ ...editingClient, email: e.target.value })
+                      }
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-phone">Phone</Label>
+                    <Input
+                      id="edit-phone"
+                      value={editingClient.phone}
+                      onChange={(e) =>
+                        setEditingClient({ ...editingClient, phone: e.target.value })
+                      }
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-state">State</Label>
+                    <Input
+                      id="edit-state"
+                      value={editingClient.state}
+                      onChange={(e) =>
+                        setEditingClient({ ...editingClient, state: e.target.value })
+                      }
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-type">Client Type</Label>
+                    <Select
+                      value={editingClient.client_type}
+                      onValueChange={(value: "Farmer" | "FertilizerCompany" | "Dealer") =>
+                        setEditingClient({ ...editingClient, client_type: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Farmer">Farmer</SelectItem>
+                        <SelectItem value="FertilizerCompany">Fertilizer Company</SelectItem>
+                        <SelectItem value="Dealer">Dealer</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="edit-active"
+                    checked={editingClient.is_active}
+                    onChange={(e) =>
+                      setEditingClient({ ...editingClient, is_active: e.target.checked })
+                    }
+                    className="h-4 w-4"
+                  />
+                  <Label htmlFor="edit-active">Active</Label>
+                </div>
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsEditClientOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit">Save Changes</Button>
+                </div>
+              </form>
+            )}
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );
